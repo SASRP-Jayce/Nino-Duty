@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Department Bodycam Overlay</title>
+
+    <script src="https://code.jquery.com/jquery.min.js"></script>
+    <link href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/css/bootstrap.min.css" rel="stylesheet" type="text/css" />
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/js/bootstrap.min.js"></script>
+    <link href="https://netdna.bootstrapcdn.com/font-awesome/4.0.3/css/font-awesome.min.css" rel="stylesheet" type="text/css" />
+    <link href="https://fonts.googleapis.com/css?family=Share+Tech+Mono&effect=outline" rel="stylesheet" type="text/css"> 
+
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 16px;
+            color: #F8F8FF;
+            background-color: rgba(0, 0, 0, 0);
+        }
+
+        #bodycam-overlay {
+            position: fixed;
+            top: 230px;
+            right: 20px;
+            width: 300px;
+            background: rgba(0, 0, 0, 0.6);
+            display: none;
+            flex-direction: column;
+            justify-content: flex-start;
+            align-items: flex-end;
+            font-family: 'Share Tech Mono', monospace;
+            color: #F8F8FF;
+            z-index: 1000;
+            border-radius: 10px;
+            padding: 10px;
+            box-shadow: 0 6px 15px rgba(0, 0, 0, 0.7);
+        }
+
+        .bodycam-content {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+        }
+
+        .info {
+            font-size: 14px;
+            line-height: 1.5;
+            text-align: right;
+        }
+
+        .live-indicator {
+            color: red;
+            font-weight: bold;
+        }
+
+        .Blink {
+            animation: blinker 1.5s cubic-bezier(.5, 0, 1, 1) infinite alternate;  
+        }
+
+        @keyframes blinker {  
+            from { opacity: 1; }
+            to { opacity: 0; }
+        }
+    </style>
+</head>
+<body>
+
+    <div id="bodycam-overlay">
+        <div class="bodycam-content">
+            <div class="info">
+                <span class="live-indicator">LIVE</span> <i class="fa fa-circle text-danger Blink"></i> <span id="time-elapsed">0m</span> <br>
+                <span id="player">Name</span> - <span id="callsign">Callsign</span> <br>
+                <span id="agency">Department Name</span> <br>
+                <span id="timestamp">Date</span>
+            </div>
+        </div>
+    </div>
+
+    <script>
+              const departmentInfo = {
+            "SAST": { fullName: "San Andreas State Trooper's" },
+            "LSPD": { fullName: "Los Santos Police Department" },
+            "BCSO": { fullName: "Blaine County Sheriff's Office" },
+            "SAFR": { fullName: "San Andreas Fire Rescue" },
+            "DOHS": { fullName: "Department Of Homefront Security" },
+            "default": { fullName: "Unknown Department" }
+        };
+
+        let startTime = null;
+        let elapsedInterval = null;
+        let dateInterval = null;
+
+        const bodycamSound = new Audio('https://cdn.discordapp.com/attachments/1337280109400555550/1351466759609257994/axon-body-cam-made-with-Voicemod.mp3');
+        bodycamSound.volume = 0.2;
+
+        function updateElapsedTime() {
+            if (startTime) {
+                let elapsedMinutes = Math.floor((Date.now() - startTime) / 60000);
+                document.getElementById('time-elapsed').innerText = `${elapsedMinutes}m`;
+            }
+        }
+
+        function updateLiveDate(ts) {
+            if (!ts) {
+                ts = Date.now();
+            }
+            document.getElementById('timestamp').innerText = new Date(ts).toLocaleString();
+        }
+
+        window.addEventListener('message', function (event) {
+            if (event.data.type === 'showBodycam') {
+                const overlay = document.getElementById('bodycam-overlay');
+                overlay.style.display = 'flex';
+                overlay.style.opacity = 1;
+                document.getElementById('player').innerText = event.data.name || "Unknown";
+                document.getElementById('callsign').innerText = event.data.callsign || "[000]";
+
+                startTime = Date.now();
+                clearInterval(elapsedInterval);
+                elapsedInterval = setInterval(updateElapsedTime, 60000);
+                updateElapsedTime();
+
+                let departmentKey = event.data.department || "default";
+                let department = departmentInfo[departmentKey] || departmentInfo["default"];
+                document.getElementById('agency').innerText = department.fullName;
+
+                // Handle timestamp (seconds or ms)
+                let ts = event.data.timestamp;
+                if (ts && ts < 10000000000) { // seconds to ms
+                    ts = ts * 1000;
+                }
+
+                updateLiveDate(ts);
+                clearInterval(dateInterval);
+                dateInterval = setInterval(() => updateLiveDate(Date.now()), 1000);
+            } 
+            else if (event.data.type === 'removeBodycam') {
+                const overlay = document.getElementById('bodycam-overlay');
+                overlay.style.opacity = 0;
+                setTimeout(() => {
+                    overlay.style.display = 'none';
+                }, 500);
+
+                clearInterval(elapsedInterval);
+                clearInterval(dateInterval);
+                startTime = null;
+                document.getElementById('time-elapsed').innerText = '0m';
+            }
+        });
+    </script>
+</body>
+</html>
